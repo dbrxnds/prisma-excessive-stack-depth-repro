@@ -1,0 +1,1876 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Core User & Authentication
+model User {
+  id                      Int                       @id @default(autoincrement())
+  email                   String                    @unique
+  name                    String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  posts                   Post[]
+  profile                 Profile?
+  addresses               Address[]
+  settings                UserSettings?
+  sessions                UserSession[]
+  roles                   UserRole[]
+  comments                Comment[]
+  likes                   Like[]
+  followers               Follow[]                  @relation("Followers")
+  following               Follow[]                  @relation("Following")
+  sentMessages            Message[]                 @relation("SentMessages")
+  conversations           ConversationParticipant[]
+  notifications           Notification[]
+  activities              Activity[]
+  bookmarks               Bookmark[]
+  favorites               Favorite[]
+  ratings                 Rating[]
+  reviews                 Review[]
+  reports                 Report[]                  @relation("Reporter")
+  orders                  Order[]
+  cart                    Cart?
+  teamMemberships         TeamMember[]
+  organizationMemberships OrganizationMember[]
+  invitations             Invitation[]
+  auditLogs               AuditLog[]
+  media                   Media[]
+  payments                Payment[]
+  subscriptions           Subscription[]
+  flags                   Flag[]
+  postRevisions           PostRevision[]
+  tickets                 SupportTicket[]           @relation("TicketCreator")
+  assignedTickets         SupportTicket[]           @relation("TicketAssignee")
+}
+
+model Profile {
+  id          Int       @id @default(autoincrement())
+  bio         String?
+  avatar      String?
+  website     String?
+  birthDate   DateTime?
+  phoneNumber String?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int       @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Address {
+  id        Int      @id @default(autoincrement())
+  street    String
+  city      String
+  state     String
+  country   String
+  zipCode   String
+  isDefault Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserSettings {
+  id                 Int      @id @default(autoincrement())
+  theme              String   @default("light")
+  language           String   @default("en")
+  emailNotifications Boolean  @default(true)
+  pushNotifications  Boolean  @default(true)
+  privacy            String   @default("public")
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             Int      @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model UserSession {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime @default(now())
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model UserRole {
+  id         Int      @id @default(autoincrement())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId     Int
+  assignedAt DateTime @default(now())
+
+  @@unique([userId, roleId])
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?
+  resource    String
+  action      String
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model RolePermission {
+  id           Int        @id @default(autoincrement())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId       Int
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId Int
+  grantedAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+}
+
+// Content & Posts
+model Post {
+  id            Int            @id @default(autoincrement())
+  title         String
+  slug          String         @unique
+  content       String?
+  excerpt       String?
+  published     Boolean        @default(false)
+  publishedAt   DateTime?
+  featuredImage String?
+  author        User?          @relation(fields: [authorId], references: [id])
+  authorId      Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  comments      Comment[]
+  likes         Like[]
+  tags          PostTag[]
+  categories    PostCategory[]
+  media         PostMedia[]
+  revisions     PostRevision[]
+  bookmarks     Bookmark[]
+  ratings       Rating[]
+  views         PostView[]
+  reports       Report[]
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  content   String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  Int
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  parentId  Int?
+  replies   Comment[] @relation("CommentReplies")
+  likes     Like[]
+  reports   Report[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId Int?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+}
+
+model Tag {
+  id        Int          @id @default(autoincrement())
+  name      String       @unique
+  slug      String       @unique
+  posts     PostTag[]
+  products  ProductTag[]
+  createdAt DateTime     @default(now())
+}
+
+model PostTag {
+  id     Int  @id @default(autoincrement())
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId Int
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId  Int
+
+  @@unique([postId, tagId])
+}
+
+model Category {
+  id               Int               @id @default(autoincrement())
+  name             String            @unique
+  slug             String            @unique
+  description      String?
+  parent           Category?         @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  parentId         Int?
+  children         Category[]        @relation("CategoryHierarchy")
+  posts            PostCategory[]
+  products         ProductCategory[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  courseCategories CourseCategory[]
+}
+
+model PostCategory {
+  id         Int      @id @default(autoincrement())
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId     Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId Int
+
+  @@unique([postId, categoryId])
+}
+
+model PostRevision {
+  id        Int      @id @default(autoincrement())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+  title     String
+  content   String?
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+  createdAt DateTime @default(now())
+}
+
+model PostView {
+  id        Int      @id @default(autoincrement())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+  ipAddress String?
+  userAgent String?
+  viewedAt  DateTime @default(now())
+}
+
+// Media Management
+model Media {
+  id           Int            @id @default(autoincrement())
+  filename     String
+  url          String
+  mimeType     String
+  size         Int
+  width        Int?
+  height       Int?
+  uploadedBy   User           @relation(fields: [uploadedById], references: [id])
+  uploadedById Int
+  posts        PostMedia[]
+  products     ProductMedia[]
+  createdAt    DateTime       @default(now())
+}
+
+model PostMedia {
+  id      Int   @id @default(autoincrement())
+  post    Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId  Int
+  media   Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  mediaId Int
+  order   Int   @default(0)
+
+  @@unique([postId, mediaId])
+}
+
+// Social Features
+model Follow {
+  id          Int      @id @default(autoincrement())
+  follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  followerId  Int
+  following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  followingId Int
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime @default(now())
+}
+
+model Conversation {
+  id           Int                       @id @default(autoincrement())
+  title        String?
+  participants ConversationParticipant[]
+  messages     Message[]
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+}
+
+model ConversationParticipant {
+  id             Int          @id @default(autoincrement())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         Int
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  content        String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId Int
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// E-commerce
+model Product {
+  id           Int               @id @default(autoincrement())
+  name         String
+  slug         String            @unique
+  description  String?
+  price        Float
+  comparePrice Float?
+  sku          String?           @unique
+  stock        Int               @default(0)
+  isActive     Boolean           @default(true)
+  categories   ProductCategory[]
+  tags         ProductTag[]
+  media        ProductMedia[]
+  orderItems   OrderItem[]
+  cartItems    CartItem[]
+  reviews      Review[]
+  ratings      Rating[]
+  variants     ProductVariant[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model ProductCategory {
+  id         Int      @id @default(autoincrement())
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId Int
+
+  @@unique([productId, categoryId])
+}
+
+model ProductTag {
+  id        Int     @id @default(autoincrement())
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId     Int
+
+  @@unique([productId, tagId])
+}
+
+model ProductMedia {
+  id        Int     @id @default(autoincrement())
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  media     Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  mediaId   Int
+  order     Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  @@unique([productId, mediaId])
+}
+
+model ProductVariant {
+  id         Int         @id @default(autoincrement())
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  Int
+  name       String
+  sku        String?     @unique
+  price      Float
+  stock      Int         @default(0)
+  orderItems OrderItem[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  cartItems  CartItem[]
+}
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int        @unique
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        Int             @id @default(autoincrement())
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId    Int
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  variantId Int?
+  quantity  Int             @default(1)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([cartId, productId, variantId])
+}
+
+model Order {
+  id          Int         @id @default(autoincrement())
+  orderNumber String      @unique
+  status      String      @default("pending")
+  subtotal    Float
+  tax         Float       @default(0)
+  shipping    Float       @default(0)
+  total       Float
+  user        User        @relation(fields: [userId], references: [id])
+  userId      Int
+  address     Address?    @relation(fields: [addressId], references: [id])
+  addressId   Int?
+  items       OrderItem[]
+  payments    Payment[]
+  shipments   Shipment[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        Int             @id @default(autoincrement())
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   Int
+  product   Product         @relation(fields: [productId], references: [id])
+  productId Int
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  variantId Int?
+  quantity  Int
+  price     Float
+  total     Float
+  createdAt DateTime        @default(now())
+}
+
+model Payment {
+  id            Int      @id @default(autoincrement())
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       Int
+  user          User     @relation(fields: [userId], references: [id])
+  userId        Int
+  amount        Float
+  currency      String   @default("USD")
+  status        String   @default("pending")
+  paymentMethod String
+  transactionId String?  @unique
+  createdAt     DateTime @default(now())
+}
+
+model Shipment {
+  id             Int       @id @default(autoincrement())
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId        Int
+  trackingNumber String?   @unique
+  carrier        String?
+  status         String    @default("pending")
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// Organizations & Teams
+model Organization {
+  id          Int                  @id @default(autoincrement())
+  name        String               @unique
+  slug        String               @unique
+  description String?
+  website     String?
+  members     OrganizationMember[]
+  teams       Team[]
+  projects    Project[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+}
+
+model OrganizationMember {
+  id             Int          @id @default(autoincrement())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         Int
+  role           String       @default("member")
+  joinedAt       DateTime     @default(now())
+
+  @@unique([organizationId, userId])
+}
+
+model Team {
+  id             Int           @id @default(autoincrement())
+  name           String
+  description    String?
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId Int
+  members        TeamMember[]
+  projects       ProjectTeam[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model TeamMember {
+  id       Int      @id @default(autoincrement())
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId   Int
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   Int
+  role     String   @default("member")
+  joinedAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+}
+
+model Invitation {
+  id          Int      @id @default(autoincrement())
+  email       String
+  token       String   @unique
+  invitedBy   User     @relation(fields: [invitedById], references: [id])
+  invitedById Int
+  status      String   @default("pending")
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+}
+
+model Project {
+  id             Int           @id @default(autoincrement())
+  name           String
+  slug           String        @unique
+  description    String?
+  status         String        @default("active")
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId Int
+  teams          ProjectTeam[]
+  tasks          Task[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model ProjectTeam {
+  id        Int     @id @default(autoincrement())
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId Int
+  team      Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    Int
+
+  @@unique([projectId, teamId])
+}
+
+model Task {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  status      String    @default("todo")
+  priority    String    @default("medium")
+  dueDate     DateTime?
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Activity & Audit
+model Activity {
+  id         Int      @id @default(autoincrement())
+  type       String
+  action     String
+  entityType String
+  entityId   Int
+  metadata   String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String
+  entityType String
+  entityId   Int
+  oldValue   String?
+  newValue   String?
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     Int?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+// User Engagement
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  itemType  String
+  itemId    Int
+  createdAt DateTime @default(now())
+}
+
+model Rating {
+  id        Int      @id @default(autoincrement())
+  value     Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@unique([userId, productId])
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String
+  rating    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Report {
+  id          Int      @id @default(autoincrement())
+  reason      String
+  description String?
+  status      String   @default("pending")
+  reporter    User     @relation("Reporter", fields: [reporterId], references: [id])
+  reporterId  Int
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId      Int?
+  comment     Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId   Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Flag {
+  id        Int      @id @default(autoincrement())
+  type      String
+  itemType  String
+  itemId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime @default(now())
+}
+
+// Subscriptions
+model Subscription {
+  id                 Int       @id @default(autoincrement())
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             Int
+  plan               String
+  status             String    @default("active")
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAt           DateTime?
+  canceledAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+// Support
+model SupportTicket {
+  id          Int                @id @default(autoincrement())
+  subject     String
+  description String
+  status      String             @default("open")
+  priority    String             @default("normal")
+  creator     User               @relation("TicketCreator", fields: [creatorId], references: [id])
+  creatorId   Int
+  assignee    User?              @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  assigneeId  Int?
+  responses   TicketResponse[]
+  attachments TicketAttachment[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model TicketResponse {
+  id        Int           @id @default(autoincrement())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId  Int
+  content   String
+  isStaff   Boolean       @default(false)
+  createdAt DateTime      @default(now())
+}
+
+model TicketAttachment {
+  id        Int           @id @default(autoincrement())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId  Int
+  filename  String
+  url       String
+  size      Int
+  createdAt DateTime      @default(now())
+}
+
+// Learning Management System
+model Course {
+  id           Int                @id @default(autoincrement())
+  title        String
+  slug         String             @unique
+  description  String?
+  thumbnail    String?
+  price        Float              @default(0)
+  level        String             @default("beginner")
+  status       String             @default("draft")
+  publishedAt  DateTime?
+  modules      CourseModule[]
+  enrollments  Enrollment[]
+  instructors  CourseInstructor[]
+  categories   CourseCategory[]
+  reviews      CourseReview[]
+  certificates Certificate[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model CourseInstructor {
+  id           Int        @id @default(autoincrement())
+  course       Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId     Int
+  instructor   Instructor @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  instructorId Int
+  role         String     @default("primary")
+  createdAt    DateTime   @default(now())
+
+  @@unique([courseId, instructorId])
+}
+
+model Instructor {
+  id        Int                @id @default(autoincrement())
+  name      String
+  bio       String?
+  avatar    String?
+  title     String?
+  courses   CourseInstructor[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model CourseCategory {
+  id         Int      @id @default(autoincrement())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId   Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId Int
+
+  @@unique([courseId, categoryId])
+}
+
+model CourseModule {
+  id          Int      @id @default(autoincrement())
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId    Int
+  title       String
+  description String?
+  order       Int      @default(0)
+  lessons     Lesson[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Lesson {
+  id          Int              @id @default(autoincrement())
+  module      CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId    Int
+  title       String
+  content     String?
+  videoUrl    String?
+  duration    Int?
+  order       Int              @default(0)
+  assignments Assignment[]
+  quizzes     Quiz[]
+  progress    LessonProgress[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Enrollment {
+  id          Int       @id @default(autoincrement())
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId    Int
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   Int
+  status      String    @default("active")
+  progress    Float     @default(0)
+  completedAt DateTime?
+  enrolledAt  DateTime  @default(now())
+
+  @@unique([courseId, studentId])
+}
+
+model Student {
+  id           Int                    @id @default(autoincrement())
+  name         String
+  email        String                 @unique
+  enrollments  Enrollment[]
+  submissions  AssignmentSubmission[]
+  quizAttempts QuizAttempt[]
+  progress     LessonProgress[]
+  certificates Certificate[]
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+}
+
+model LessonProgress {
+  id          Int       @id @default(autoincrement())
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId    Int
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   Int
+  completed   Boolean   @default(false)
+  watchTime   Int       @default(0)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([lessonId, studentId])
+}
+
+model Assignment {
+  id          Int                    @id @default(autoincrement())
+  lesson      Lesson                 @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId    Int
+  title       String
+  description String
+  dueDate     DateTime?
+  maxScore    Int                    @default(100)
+  submissions AssignmentSubmission[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+}
+
+model AssignmentSubmission {
+  id           Int        @id @default(autoincrement())
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignmentId Int
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    Int
+  content      String
+  attachments  String?
+  score        Int?
+  feedback     String?
+  submittedAt  DateTime   @default(now())
+  gradedAt     DateTime?
+
+  @@unique([assignmentId, studentId])
+}
+
+model Quiz {
+  id           Int            @id @default(autoincrement())
+  lesson       Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId     Int
+  title        String
+  description  String?
+  timeLimit    Int?
+  passingScore Int            @default(70)
+  questions    QuizQuestion[]
+  attempts     QuizAttempt[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model QuizQuestion {
+  id        Int          @id @default(autoincrement())
+  quiz      Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId    Int
+  question  String
+  type      String       @default("multiple_choice")
+  points    Int          @default(1)
+  order     Int          @default(0)
+  options   QuizOption[]
+  answers   QuizAnswer[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model QuizOption {
+  id         Int          @id @default(autoincrement())
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId Int
+  text       String
+  isCorrect  Boolean      @default(false)
+  order      Int          @default(0)
+}
+
+model QuizAttempt {
+  id          Int          @id @default(autoincrement())
+  quiz        Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId      Int
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   Int
+  score       Float
+  passed      Boolean      @default(false)
+  answers     QuizAnswer[]
+  startedAt   DateTime     @default(now())
+  completedAt DateTime?
+}
+
+model QuizAnswer {
+  id         Int          @id @default(autoincrement())
+  attempt    QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  attemptId  Int
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId Int
+  answer     String
+  isCorrect  Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+}
+
+model Certificate {
+  id        Int       @id @default(autoincrement())
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId  Int
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId Int
+  code      String    @unique
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@unique([courseId, studentId])
+}
+
+model CourseReview {
+  id        Int      @id @default(autoincrement())
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId  Int
+  rating    Int
+  title     String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Event Management
+model Event {
+  id            Int                 @id @default(autoincrement())
+  title         String
+  slug          String              @unique
+  description   String?
+  thumbnail     String?
+  startDate     DateTime
+  endDate       DateTime
+  timezone      String
+  location      String?
+  type          String              @default("in-person")
+  capacity      Int?
+  status        String              @default("draft")
+  venue         Venue?              @relation(fields: [venueId], references: [id])
+  venueId       Int?
+  registrations EventRegistration[]
+  tickets       EventTicket[]
+  sessions      EventSession[]
+  speakers      EventSpeaker[]
+  sponsors      EventSponsor[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+model Venue {
+  id        Int      @id @default(autoincrement())
+  name      String
+  address   String
+  city      String
+  state     String?
+  country   String
+  zipCode   String?
+  capacity  Int?
+  amenities String?
+  events    Event[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EventTicket {
+  id            Int                 @id @default(autoincrement())
+  event         Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId       Int
+  name          String
+  description   String?
+  price         Float
+  quantity      Int
+  sold          Int                 @default(0)
+  salesStart    DateTime?
+  salesEnd      DateTime?
+  registrations EventRegistration[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+model EventRegistration {
+  id          Int         @id @default(autoincrement())
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId     Int
+  ticket      EventTicket @relation(fields: [ticketId], references: [id])
+  ticketId    Int
+  attendee    Attendee    @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  attendeeId  Int
+  status      String      @default("confirmed")
+  checkedIn   Boolean     @default(false)
+  checkedInAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Attendee {
+  id            Int                 @id @default(autoincrement())
+  firstName     String
+  lastName      String
+  email         String              @unique
+  phone         String?
+  company       String?
+  jobTitle      String?
+  registrations EventRegistration[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+model EventSession {
+  id          Int              @id @default(autoincrement())
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId     Int
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  speakers    SessionSpeaker[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Speaker {
+  id        Int              @id @default(autoincrement())
+  name      String
+  bio       String?
+  photo     String?
+  title     String?
+  company   String?
+  email     String?          @unique
+  events    EventSpeaker[]
+  sessions  SessionSpeaker[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model EventSpeaker {
+  id        Int     @id @default(autoincrement())
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   Int
+  speaker   Speaker @relation(fields: [speakerId], references: [id], onDelete: Cascade)
+  speakerId Int
+  featured  Boolean @default(false)
+
+  @@unique([eventId, speakerId])
+}
+
+model SessionSpeaker {
+  id        Int          @id @default(autoincrement())
+  session   EventSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId Int
+  speaker   Speaker      @relation(fields: [speakerId], references: [id], onDelete: Cascade)
+  speakerId Int
+
+  @@unique([sessionId, speakerId])
+}
+
+model Sponsor {
+  id        Int            @id @default(autoincrement())
+  name      String
+  logo      String?
+  website   String?
+  tier      String         @default("bronze")
+  events    EventSponsor[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model EventSponsor {
+  id        Int     @id @default(autoincrement())
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   Int
+  sponsor   Sponsor @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  sponsorId Int
+  tier      String  @default("bronze")
+  amount    Float?
+
+  @@unique([eventId, sponsorId])
+}
+
+// File Management
+model Folder {
+  id        Int           @id @default(autoincrement())
+  name      String
+  parent    Folder?       @relation("FolderHierarchy", fields: [parentId], references: [id])
+  parentId  Int?
+  children  Folder[]      @relation("FolderHierarchy")
+  files     File[]
+  shares    FolderShare[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model File {
+  id          Int              @id @default(autoincrement())
+  name        String
+  filename    String
+  path        String
+  mimeType    String
+  size        Int
+  checksum    String?
+  folder      Folder?          @relation(fields: [folderId], references: [id])
+  folderId    Int?
+  versions    FileVersion[]
+  shares      FileShare[]
+  permissions FilePermission[]
+  downloads   FileDownload[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model FileVersion {
+  id        Int      @id @default(autoincrement())
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId    Int
+  version   Int
+  filename  String
+  path      String
+  size      Int
+  checksum  String?
+  createdAt DateTime @default(now())
+}
+
+model FileShare {
+  id           Int       @id @default(autoincrement())
+  file         File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId       Int
+  token        String    @unique
+  password     String?
+  expiresAt    DateTime?
+  maxDownloads Int?
+  downloads    Int       @default(0)
+  createdAt    DateTime  @default(now())
+}
+
+model FolderShare {
+  id        Int       @id @default(autoincrement())
+  folder    Folder    @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  folderId  Int
+  token     String    @unique
+  password  String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model FilePermission {
+  id         Int      @id @default(autoincrement())
+  file       File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId     Int
+  userEmail  String
+  permission String   @default("view")
+  createdAt  DateTime @default(now())
+
+  @@unique([fileId, userEmail])
+}
+
+model FileDownload {
+  id           Int      @id @default(autoincrement())
+  file         File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId       Int
+  ipAddress    String?
+  userAgent    String?
+  downloadedAt DateTime @default(now())
+}
+
+// Analytics
+model PageView {
+  id        Int               @id @default(autoincrement())
+  path      String
+  title     String?
+  referrer  String?
+  ipAddress String?
+  userAgent String?
+  sessionId String?
+  duration  Int?
+  session   AnalyticsSession? @relation(fields: [sessionId], references: [id])
+  viewedAt  DateTime          @default(now())
+}
+
+model AnalyticsSession {
+  id        String           @id @default(uuid())
+  ipAddress String?
+  userAgent String?
+  country   String?
+  city      String?
+  device    String?
+  browser   String?
+  os        String?
+  views     PageView[]
+  events    AnalyticsEvent[]
+  startedAt DateTime         @default(now())
+  endedAt   DateTime?
+}
+
+model AnalyticsEvent {
+  id        Int               @id @default(autoincrement())
+  name      String
+  category  String?
+  action    String?
+  label     String?
+  value     Float?
+  metadata  String?
+  session   AnalyticsSession? @relation(fields: [sessionId], references: [id])
+  sessionId String?
+  createdAt DateTime          @default(now())
+}
+
+model ConversionGoal {
+  id          Int          @id @default(autoincrement())
+  name        String
+  type        String
+  value       Float?
+  conversions Conversion[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Conversion {
+  id        Int            @id @default(autoincrement())
+  goal      ConversionGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  goalId    Int
+  sessionId String?
+  value     Float?
+  metadata  String?
+  createdAt DateTime       @default(now())
+}
+
+model ABTest {
+  id          Int                @id @default(autoincrement())
+  name        String
+  description String?
+  status      String             @default("draft")
+  startDate   DateTime?
+  endDate     DateTime?
+  variants    ABTestVariant[]
+  assignments ABTestAssignment[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model ABTestVariant {
+  id          Int                @id @default(autoincrement())
+  test        ABTest             @relation(fields: [testId], references: [id], onDelete: Cascade)
+  testId      Int
+  name        String
+  allocation  Float              @default(50)
+  conversions Int                @default(0)
+  views       Int                @default(0)
+  assignments ABTestAssignment[]
+  createdAt   DateTime           @default(now())
+}
+
+model ABTestAssignment {
+  id         Int           @id @default(autoincrement())
+  test       ABTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
+  testId     Int
+  variant    ABTestVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variantId  Int
+  sessionId  String
+  assignedAt DateTime      @default(now())
+
+  @@unique([testId, sessionId])
+}
+
+// Marketing
+model Campaign {
+  id          Int               @id @default(autoincrement())
+  name        String
+  description String?
+  type        String
+  status      String            @default("draft")
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Float?
+  emails      CampaignEmail[]
+  segments    CampaignSegment[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model CampaignEmail {
+  id          Int              @id @default(autoincrement())
+  campaign    Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId  Int
+  subject     String
+  content     String
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  opens       Int              @default(0)
+  clicks      Int              @default(0)
+  recipients  EmailRecipient[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model EmailRecipient {
+  id        Int           @id @default(autoincrement())
+  email     CampaignEmail @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  emailId   Int
+  address   String
+  status    String        @default("pending")
+  sentAt    DateTime?
+  openedAt  DateTime?
+  clickedAt DateTime?
+  bouncedAt DateTime?
+  createdAt DateTime      @default(now())
+}
+
+model Segment {
+  id          Int                 @id @default(autoincrement())
+  name        String
+  description String?
+  rules       String
+  campaigns   CampaignSegment[]
+  subscribers SegmentSubscriber[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model CampaignSegment {
+  id         Int      @id @default(autoincrement())
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId Int
+  segment    Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  segmentId  Int
+
+  @@unique([campaignId, segmentId])
+}
+
+model SegmentSubscriber {
+  id           Int        @id @default(autoincrement())
+  segment      Segment    @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  segmentId    Int
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  subscriberId Int
+  addedAt      DateTime   @default(now())
+
+  @@unique([segmentId, subscriberId])
+}
+
+model Subscriber {
+  id          Int                    @id @default(autoincrement())
+  email       String                 @unique
+  firstName   String?
+  lastName    String?
+  status      String                 @default("active")
+  segments    SegmentSubscriber[]
+  newsletters NewsletterSubscriber[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+}
+
+model Newsletter {
+  id          Int                    @id @default(autoincrement())
+  name        String
+  description String?
+  frequency   String?
+  subscribers NewsletterSubscriber[]
+  issues      NewsletterIssue[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+}
+
+model NewsletterSubscriber {
+  id           Int        @id @default(autoincrement())
+  newsletter   Newsletter @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+  newsletterId Int
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  subscriberId Int
+  subscribedAt DateTime   @default(now())
+
+  @@unique([newsletterId, subscriberId])
+}
+
+model NewsletterIssue {
+  id           Int        @id @default(autoincrement())
+  newsletter   Newsletter @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+  newsletterId Int
+  subject      String
+  content      String
+  status       String     @default("draft")
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  opens        Int        @default(0)
+  clicks       Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model LandingPage {
+  id          Int       @id @default(autoincrement())
+  title       String
+  slug        String    @unique
+  content     String
+  template    String?
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+  views       Int       @default(0)
+  conversions Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Scheduling & Appointments
+model Calendar {
+  id           Int            @id @default(autoincrement())
+  name         String
+  description  String?
+  timezone     String
+  availability Availability[]
+  appointments Appointment[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model Availability {
+  id         Int      @id @default(autoincrement())
+  calendar   Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  calendarId Int
+  dayOfWeek  Int
+  startTime  String
+  endTime    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Appointment {
+  id            Int      @id @default(autoincrement())
+  calendar      Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  calendarId    Int
+  title         String
+  description   String?
+  startTime     DateTime
+  endTime       DateTime
+  status        String   @default("scheduled")
+  attendeeEmail String?
+  attendeeName  String?
+  metadata      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model TimeSlot {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  startTime String
+  endTime   String
+  available Boolean  @default(true)
+  capacity  Int      @default(1)
+  booked    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Billing & Invoicing
+model Invoice {
+  id           Int                  @id @default(autoincrement())
+  number       String               @unique
+  customer     Customer             @relation(fields: [customerId], references: [id])
+  customerId   Int
+  status       String               @default("draft")
+  subtotal     Float
+  tax          Float                @default(0)
+  total        Float
+  currency     String               @default("USD")
+  dueDate      DateTime?
+  paidAt       DateTime?
+  items        InvoiceItem[]
+  transactions InvoiceTransaction[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+}
+
+model Customer {
+  id             Int       @id @default(autoincrement())
+  name           String
+  email          String    @unique
+  phone          String?
+  company        String?
+  taxId          String?
+  billingAddress String?
+  invoices       Invoice[]
+  credits        Credit[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model InvoiceItem {
+  id          Int     @id @default(autoincrement())
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   Int
+  description String
+  quantity    Float
+  unitPrice   Float
+  total       Float
+  taxRate     Float   @default(0)
+}
+
+model InvoiceTransaction {
+  id          Int       @id @default(autoincrement())
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   Int
+  amount      Float
+  method      String
+  reference   String?
+  status      String    @default("pending")
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Credit {
+  id         Int       @id @default(autoincrement())
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId Int
+  amount     Float
+  balance    Float
+  reason     String?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Refund {
+  id          Int       @id @default(autoincrement())
+  reference   String    @unique
+  amount      Float
+  reason      String?
+  status      String    @default("pending")
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// Forum & Community
+model ForumCategory {
+  id          Int           @id @default(autoincrement())
+  name        String
+  slug        String        @unique
+  description String?
+  order       Int           @default(0)
+  threads     ForumThread[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model ForumThread {
+  id         Int           @id @default(autoincrement())
+  title      String
+  slug       String        @unique
+  category   ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId Int
+  isPinned   Boolean       @default(false)
+  isLocked   Boolean       @default(false)
+  views      Int           @default(0)
+  posts      ForumPost[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model ForumPost {
+  id          Int         @id @default(autoincrement())
+  thread      ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  threadId    Int
+  content     String
+  authorName  String
+  authorEmail String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Moderator {
+  id        Int               @id @default(autoincrement())
+  name      String
+  email     String            @unique
+  role      String            @default("moderator")
+  actions   ModeratorAction[]
+  createdAt DateTime          @default(now())
+}
+
+model ModeratorAction {
+  id          Int       @id @default(autoincrement())
+  moderator   Moderator @relation(fields: [moderatorId], references: [id])
+  moderatorId Int
+  action      String
+  entityType  String
+  entityId    Int
+  reason      String?
+  createdAt   DateTime  @default(now())
+}
+
+// Surveys & Polls
+model Survey {
+  id          Int              @id @default(autoincrement())
+  title       String
+  description String?
+  status      String           @default("draft")
+  startDate   DateTime?
+  endDate     DateTime?
+  questions   SurveyQuestion[]
+  responses   SurveyResponse[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model SurveyQuestion {
+  id        Int                    @id @default(autoincrement())
+  survey    Survey                 @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId  Int
+  question  String
+  type      String                 @default("text")
+  required  Boolean                @default(false)
+  order     Int                    @default(0)
+  options   SurveyQuestionOption[]
+  answers   SurveyAnswer[]
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+}
+
+model SurveyQuestionOption {
+  id         Int            @id @default(autoincrement())
+  question   SurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId Int
+  text       String
+  order      Int            @default(0)
+}
+
+model SurveyResponse {
+  id              Int            @id @default(autoincrement())
+  survey          Survey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId        Int
+  respondentEmail String?
+  respondentName  String?
+  answers         SurveyAnswer[]
+  submittedAt     DateTime       @default(now())
+}
+
+model SurveyAnswer {
+  id         Int            @id @default(autoincrement())
+  response   SurveyResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  responseId Int
+  question   SurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId Int
+  answer     String
+  createdAt  DateTime       @default(now())
+}
+
+model Poll {
+  id            Int          @id @default(autoincrement())
+  question      String
+  description   String?
+  status        String       @default("active")
+  allowMultiple Boolean      @default(false)
+  startDate     DateTime?
+  endDate       DateTime?
+  options       PollOption[]
+  votes         PollVote[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model PollOption {
+  id        Int        @id @default(autoincrement())
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pollId    Int
+  text      String
+  order     Int        @default(0)
+  votes     PollVote[]
+  createdAt DateTime   @default(now())
+}
+
+model PollVote {
+  id        Int        @id @default(autoincrement())
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pollId    Int
+  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  optionId  Int
+  ipAddress String?
+  votedAt   DateTime   @default(now())
+}
+
+// Job Board
+model Company {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String   @unique
+  logo        String?
+  website     String?
+  description String?
+  size        String?
+  industry    String?
+  location    String?
+  jobs        Job[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Job {
+  id           Int              @id @default(autoincrement())
+  title        String
+  slug         String           @unique
+  description  String
+  requirements String?
+  benefits     String?
+  type         String           @default("full-time")
+  location     String?
+  remote       Boolean          @default(false)
+  salary       String?
+  status       String           @default("open")
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId    Int
+  applications JobApplication[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model JobApplication {
+  id          Int       @id @default(autoincrement())
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId       Int
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  applicantId Int
+  status      String    @default("pending")
+  coverLetter String?
+  resume      String?
+  submittedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+}
+
+model Applicant {
+  id           Int              @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  email        String           @unique
+  phone        String?
+  location     String?
+  portfolio    String?
+  linkedIn     String?
+  applications JobApplication[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+// Webhooks & Integrations
+model Webhook {
+  id         Int               @id @default(autoincrement())
+  url        String
+  events     String
+  secret     String?
+  isActive   Boolean           @default(true)
+  deliveries WebhookDelivery[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model WebhookDelivery {
+  id          Int       @id @default(autoincrement())
+  webhook     Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  webhookId   Int
+  event       String
+  payload     String
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  response    String?
+  deliveredAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model APIKey {
+  id          Int       @id @default(autoincrement())
+  name        String
+  key         String    @unique
+  permissions String
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  logs        APILog[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model APILog {
+  id         Int      @id @default(autoincrement())
+  apiKey     APIKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  apiKeyId   Int
+  endpoint   String
+  method     String
+  statusCode Int
+  duration   Int
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}
+
+model Integration {
+  id         Int              @id @default(autoincrement())
+  name       String
+  type       String
+  config     String
+  isActive   Boolean          @default(true)
+  lastSyncAt DateTime?
+  logs       IntegrationLog[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+model IntegrationLog {
+  id            Int         @id @default(autoincrement())
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  integrationId Int
+  action        String
+  status        String
+  message       String?
+  data          String?
+  createdAt     DateTime    @default(now())
+}

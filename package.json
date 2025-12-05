@@ -1,0 +1,22 @@
+{
+  "name": "script",
+  "license": "MIT",
+  "scripts": {
+    "dev": "tsx ./script.ts",
+    "generate": "DATABASE_URL=postgres:// prisma generate"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.0.0",
+    "@prisma/client": "7.0.0",
+    "dotenv": "^16.4.7",
+    "effect": "^3.19.8",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.32",
+    "prisma": "7.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3",
+    "@types/pg": "^8.15.6"
+  }
+}
