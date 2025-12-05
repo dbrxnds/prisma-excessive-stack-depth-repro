@@ -7,7 +7,7 @@ const pool = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter: pool });
 const prismaWithExtension = prisma.$extends(prismaEffectExtension);
 
-async function foo(select: Prisma.UserSelect) {
+async function getFn<T extends Prisma.UserSelect>(select: T) {
   const foo = await prisma.user.findFirst({
     where: {
       email: "test@test.com",
@@ -24,3 +24,7 @@ async function foo(select: Prisma.UserSelect) {
 
   return { foo, bar };
 }
+
+const { foo, bar } = await getFn({
+  id: true,
+});
