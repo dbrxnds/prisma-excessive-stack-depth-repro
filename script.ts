@@ -1,11 +1,10 @@
 import "dotenv/config";
 import { Prisma, PrismaClient } from "./prisma/generated/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { prismaEffectExtension } from "./extension";
 
 const pool = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter: pool });
-const prismaWithExtension = prisma.$extends(prismaEffectExtension);
+const prismaWithExtension = prisma.$extends({});
 
 async function getFn<T extends Prisma.UserSelect>(select: T) {
   const foo = await prisma.user.findFirst({
